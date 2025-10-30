@@ -1,35 +1,37 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
 import './App.css'
 
-function App() {
-  const [count, setCount] = useState(0)
+const _mods = import.meta.glob('./webp/*.{jpg,jpeg,png,svg,webp}', { eager: true })
+const images = Object.entries(_mods)
+  .map(([path, mod]) => {
+    if (!mod) return null
+    if (typeof mod === 'string') return mod
+    if (mod.default && typeof mod.default === 'string') return mod.default
+    return null
+  })
+  .filter(Boolean)
 
+
+
+export default function App() {
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <div className="app-root">
+      <header>
+        <h1>Portfolio</h1>
+      </header>
+
+      <main>
+        <section className="gallery">
+          {images.length === 0 ? (
+            <p>No images found in <code>src/images</code>.</p>
+          ) : (
+            images.map((src, i) => (
+              <figure className="photo" key={i}>
+                <img src={src} alt={`photo-${i + 1}`} loading="lazy" />
+              </figure>
+            ))
+          )}
+        </section>
+      </main>
+    </div>
   )
 }
-
-export default App
