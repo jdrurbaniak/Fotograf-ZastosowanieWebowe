@@ -1,0 +1,18 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:15-alpine  # Używamy lekkiego obrazu PostgreSQL 15
+    container_name: fotograf_db
+    ports:
+      - "5432:5432"  # Udostępniamy port 5432 na zewnątrz
+    environment:
+      - POSTGRES_USER=fotograf
+      - POSTGRES_PASSWORD=superhaslo
+      - POSTGRES_DB=fotograf_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    name: fotograf-postgres-data
