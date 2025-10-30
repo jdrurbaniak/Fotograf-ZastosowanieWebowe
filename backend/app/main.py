@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 # Tutaj będziemy importować nasze routery API
 from app.api.v1.api import api_router
@@ -9,6 +10,9 @@ app = FastAPI(
     description="Backend dla aplikacji portfolio fotografa w FastAPI.",
     version="0.1.0"
 )
+# --- Serwowanie plików statycznych (zdjęć) ---
+# Zakładamy, że przesłane zdjęcia będą przechowywane w folderze 'uploads'
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads") 
 
 # --- Konfiguracja CORS ---
 app.add_middleware(
