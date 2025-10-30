@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
 from sqlalchemy.orm import Session
 from typing import List
 import shutil # Do zapisywania plików
@@ -13,9 +13,9 @@ router = APIRouter()
 @router.post("/", response_model=schemas.photo.PhotoRead, status_code=status.HTTP_201_CREATED)
 def create_new_photo(
     # Zamiast JSON, oczekujemy danych formularza
-    title: str = Depends(),
-    album_id: int = Depends(),
-    description: str | None = Depends(default=None),
+    title: str = Form(...),
+    album_id: int = Form(...),
+    description: str | None = Form(default=None),
     file: UploadFile = File(...), # To jest nasz plik zdjęcia
     db: Session = Depends(get_db_session),
     current_user: models.user.User = Depends(get_current_user)
