@@ -1,9 +1,512 @@
-.contact-page {
-  padding: auto;
+.calendar-section h2 {
+  font-size: 1.5rem;
+  margin-bottom: 1.5rem;
+  color: #000;
 }
 
-p {
+.calendar-section p {
   font-size: 1rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: 2rem;
   color: #666;
+  line-height: 1.6;
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  margin-top: 3rem;
+  gap: 1rem;
+}
+
+.nav-button {
+  padding: 0.5rem 1rem;
+  background-color: transparent;
+  color: black;
+  font-size: 0.9rem;
+  border-radius: 0;
+  transition: color 0.3s;
+  position: relative;
+  display: inline-block;
+  border: none;
+  outline: none;
+}
+
+.nav-button::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background-color: #000;
+  transition: width 0.3s ease, left 0.3s ease;
+}
+
+.nav-button:hover {
+  background-color: transparent;
+  color: #000;
+}
+
+.nav-button:hover::after {
+  width: 100%;
+  left: 0;
+}
+
+.nav-button:active {
+  background-color: transparent;
+  color: #000;
+}
+
+.nav-button:focus,
+.nav-button:focus-visible {
+  outline: none !important;
+  box-shadow: none;
+  border: none;
+}
+
+.week-range {
+  font-weight: bold;
+  color: #000;
+  font-size: 1rem;
+}
+
+.calendar-container {
+  border-radius: 10px;
+  border: 1px solid #ddd;
+  overflow: hidden;
+  width: 780px;
+  max-width: 100%;
+  display: flex;
+}
+
+.time-column-wrapper {
+  display: grid;
+  grid-template-rows: 100px 1fr;
+  border-right: 1px solid #ddd;
+}
+
+.corner-cell {
+  width: 60px;
+  background: #fff;
+  border-bottom: 1px solid #ddd;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-rows: 100px 1fr;
+  flex: 1;
+}
+
+.days-header-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  border-bottom: 1px solid #ddd;
+}
+
+.time-column {
+  display: grid;
+  grid-template-rows: repeat(13, 40px);
+  width: 60px;
+}
+
+.time-slot {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  color: #666;
+  border-bottom: 1px solid #ddd;
+  box-sizing: border-box;
+}
+
+.time-slot:last-child {
+  border-bottom: none;
+}
+
+.week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  flex: 1;
+  position: relative;
+}
+
+.slots-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-template-rows: repeat(13, 40px);
+  position: relative;
+}
+
+.reservation {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  text-align: left;
+  user-select: none;
+  background-color: #000;
+  border-radius: 8px;
+  z-index: 1;
+  pointer-events: auto;
+  padding: 5px;
+  cursor: pointer;
+}
+
+.reservation-title {
+  color: #ddd;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.1;
+}
+
+.reservation-time {
+  color: #888;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.1;
+  margin-top: 2px;
+}
+
+.day-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 100px;
+}
+
+.day-header {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: center;
+  justify-content: center;
+  background-color: white;
+  border-right: 1px solid #ddd;
+  padding: 0.5rem;
+}
+
+.day-header:last-child {
+  border-right: none;
+}
+
+.day-header.today {
+  background-color: #000;
+}
+
+.day-header.today .day-name {
+  color: #888;
+}
+
+.day-header.today .day-date {
+  color: white;
+}
+
+.day-name {
+  color: #888;
+  font-size: 0.8rem;
+}
+
+.day-date {
+  font-weight: bold;
+  font-size: 1rem;
+  color: #000;
+}
+
+.slot {
+  cursor: pointer;
+  transition: all 0.2s;
+  background-color: white;
+  border-right: 1px solid #ddd;
+  border-bottom: 1px solid #ddd;
+}
+
+.slots-grid .slot:nth-child(7n) {
+  border-right: none;
+}
+
+.slots-grid .slot:nth-last-child(-n+7) {
+  border-bottom: none;
+}
+
+.slot:not(.past):hover {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.25);
+}
+
+.slot.selected {
+  background-color: #000;
+  border-radius: 8px;
+}
+
+.slot.past {
+  background-color: #d3d3d3;
+  cursor: not-allowed;
+}
+
+.calendar-info {
+  text-align: center;
+  margin-top: 1.5rem;
+}
+
+.confirm-button {
+  padding: 0.5rem 1rem;
+  background-color: #000;
+  color: white;
+  border-radius: 50px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.3s;
+  margin-bottom: 1.5rem;
+  border: none;
+  outline: none;
+}
+
+.confirm-button:hover {
+  background-color: #444;
+}
+
+.confirm-button:active {
+  background-color: #666;
+  border: none;
+}
+
+.confirm-button:focus,
+.confirm-button:focus-visible {
+  outline: none;
+  box-shadow: none;
+  border: none;
+}
+
+@media (max-width: 780px) {
+  .calendar-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .day-column {
+    min-width: 80px;
+  }
+
+  .day-header {
+    min-height: 40px;
+  }
+
+  .nav-button {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+  }
+
+  .week-range {
+    font-size: 0.9rem;
+  }
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-box {
+  background: white;
+  padding: 2.5rem;
+  border-radius: 10px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  position: relative;
+  animation: popUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes popUp {
+  0% { opacity: 0; transform: scale(0.5); }
+  50% { transform: scale(1.05); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.modal-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: transparent;
+  border: none;
+  font-size: 2rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #888;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: lighter;
+  transition: color 0.2s;
+  z-index: 1;
+}
+
+.modal-close:hover {
+  color: #000;
+}
+
+.modal-close:focus,
+.modal-close:focus-visible {
+  outline: none;
+}
+
+.modal-box h2 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  color: #000;
+  font-size: 1.5rem;
+}
+
+.reservation-summary {
+  margin-top: 1rem;
+  background-color: black;
+  padding: 1rem;
+  border-radius: 10px;
+  margin-bottom: 0.5rem;
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  grid-template-rows: auto auto;
+  gap: 0.25rem 1rem;
+  justify-items: start;
+  align-items: center;
+  text-align: left;
+  position: relative;
+}
+
+.reservation-summary::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(60px + 0.5rem);
+  width: 1px;
+  background: white;
+  pointer-events: none;
+}
+
+/* Pozycje w siatce 2x2 */
+.summary-date-short {
+  /* lewa-góra */
+  grid-column: 1;
+  grid-row: 1;
+  color: white;
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+.summary-day {
+  /* lewy-dół */
+  grid-column: 1;
+  grid-row: 2;
+  color: #888;
+  font-weight: 400;
+  font-size: 0.9rem;
+}
+
+.summary-title {
+  /* prawa-góra */
+  grid-column: 2;
+  grid-row: 1;
+  font-weight: 500;
+  font-size: 1rem;
+  color: white;
+  margin: 0;
+}
+
+.summary-time {
+  /* prawa-dół */
+  grid-column: 2;
+  grid-row: 2;
+  font-size: 0.9rem;
+  color: #888;
+  margin: 0;
+}
+
+.modal-description {
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  color: #666;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.email-input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 50px;
+  font-size: 0.8rem;
+  margin-bottom: 1.5rem;
+  box-sizing: border-box;
+  outline: none;
+  background: white;
+  color: #000;
+}
+
+.email-input:focus {
+  border-color: #000;
+}
+
+/* Usuń niebieski kolor autofill */
+.email-input:-webkit-autofill,
+.email-input:-webkit-autofill:hover,
+.email-input:-webkit-autofill:focus,
+.email-input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px white inset !important;
+  -webkit-text-fill-color: #000 !important;
+}
+
+.modal-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.modal-confirm-btn {
+  padding: 0.5rem 1.5rem;
+  border-radius: 50px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.3s;
+  border: none;
+  outline: none;
+  background-color: #000;
+  color: white;
+}
+
+.modal-confirm-btn:hover {
+  background-color: #444;
+}
+
+.modal-confirm-btn:focus,
+.modal-confirm-btn:focus-visible {
+  outline: none;
+  box-shadow: none;
+  border: none;
+}
+
+.modal-confirm-btn:active {
+  background-color: #666;
+  border: none;
 }
