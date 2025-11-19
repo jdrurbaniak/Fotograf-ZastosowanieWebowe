@@ -16,5 +16,5 @@ class PhotoUpdate(BaseModel):
 class PhotoRead(PhotoBase):
     id: int
     album_id: int
-    
+    #test
     model_config = ConfigDict(from_attributes=True)
