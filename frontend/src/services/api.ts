@@ -39,3 +39,19 @@ export const uploadPhoto = (formData: FormData) =>
 export const updatePhoto = (id: number, data: { title?: string; description?: string; album_id?: number }) =>
   api.patch(`/api/v1/photos/${id}`, data);
 export const deletePhoto = (id: number) => api.delete(`/api/v1/photos/${id}`);
+
+// Bookings
+export const createBooking = (data: {
+  client_name: string;
+  client_email: string;
+  client_phone?: string;
+  service_name: string;
+  booking_date: string; // ISO format datetime string
+  notes?: string;
+}) => api.post('/api/v1/bookings/', data);
+
+export const getBookings = () => api.get('/api/v1/bookings/'); // Admin - wymaga tokena
+export const getPublicBookings = () => api.get('/api/v1/bookings/public'); // Publiczny - bez tokena
+export const updateBookingStatus = (id: number, status: string) =>
+  api.patch(`/api/v1/bookings/${id}`, { status });
+export const deleteBooking = (id: number) => api.delete(`/api/v1/bookings/${id}`);

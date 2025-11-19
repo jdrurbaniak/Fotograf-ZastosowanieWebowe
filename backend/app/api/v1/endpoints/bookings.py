@@ -22,7 +22,7 @@ def submit_booking(
     
     return crud.crud_booking.create_booking(db=db, booking=booking)
 
-# --- Endpointy ZABEZPIECZONE (dla fotografa/admina) ---
+# --- Endpointy PUBLICZNE/ZABEZPIECZONE ---
 
 @router.get("/", response_model=List[schemas.booking.BookingRead])
 def read_all_bookings(
@@ -33,6 +33,20 @@ def read_all_bookings(
 ):
     """
     Pobiera listę wszystkich rezerwacji. Wymaga autentykacji.
+    Dla admina - zwraca pełne dane.
+    """
+    bookings = crud.crud_booking.get_bookings(db, skip=skip, limit=limit)
+    return bookings
+
+@router.get("/public", response_model=List[schemas.booking.BookingPublicRead])
+def read_public_bookings(
+    skip: int = 0,
+    limit: int = 500,
+    db: Session = Depends(get_db_session)
+):
+    """
+    Publiczny endpoint zwracający tylko daty i czas trwania zarezerwowanych terminów.
+    Nie wymaga autentykacji. Używany przez kalendarz do oznaczania zajętych slotów.
     """
     bookings = crud.crud_booking.get_bookings(db, skip=skip, limit=limit)
     return bookings

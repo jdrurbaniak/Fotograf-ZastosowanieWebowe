@@ -332,6 +332,36 @@
   color: #222;
 }
 
+.admin-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.tab-button {
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: -2px;
+}
+
+.tab-button:hover {
+  color: #222;
+  background: #f8f9fa;
+}
+
+.tab-button.active {
+  color: #646cff;
+  border-bottom-color: #646cff;
+}
+
 .admin-section {
   background: #fff;
   border-radius: 12px;
@@ -479,6 +509,43 @@
 .album-actions {
   display: flex;
   gap: 0.5rem;
+}
+
+.bookings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.booking-card {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.booking-info {
+  flex: 1;
+}
+
+.booking-info h3 {
+  margin: 0 0 0.5rem 0;
+  color: #222;
+}
+
+.booking-info p {
+  margin: 0.25rem 0;
+  color: #666;
+  font-size: 0.95em;
+}
+
+.booking-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 /* Gallery Page - Albums Grid */

@@ -25,3 +25,10 @@ class BookingRead(BookingBase):
 # Schemat do aktualizacji statusu przez admina
 class BookingUpdateStatus(BaseModel):
     status: BookingStatus
+
+# Schemat publiczny - tylko data i notatki (dla niezalogowanych użytkowników)
+class BookingPublicRead(BaseModel):
+    booking_date: datetime
+    notes: str | None = None
+    
+    model_config = ConfigDict(from_attributes=True)

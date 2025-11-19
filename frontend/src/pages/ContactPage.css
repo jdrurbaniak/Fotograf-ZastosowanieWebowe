@@ -231,19 +231,24 @@
   border-bottom: none;
 }
 
-.slot:not(.past):hover {
-  background-color: white;
+.slot.available {
+  background-color: #d4edda;
+  cursor: pointer;
+}
+
+.slot.available:hover {
+  background-color: #c3e6cb;
   border-radius: 8px;
   box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.25);
 }
 
-.slot.selected {
-  background-color: #000;
-  border-radius: 8px;
+.slot.booked {
+  background-color: #f8d7da;
+  cursor: not-allowed;
 }
 
 .slot.past {
-  background-color: #d3d3d3;
+  background-color: #e9ecef;
   cursor: not-allowed;
 }
 

@@ -1,12 +1,22 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createBooking, getPublicBookings } from '../services/api'
 import './ContactPage.css'
+
+interface Booking {
+  id: number;
+  booking_date: string;
+  notes?: string;
+}
 
 const ContactPage = () => {
   const [currentWeek, setCurrentWeek] = useState(new Date())
-  const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set())
   const [reservationPosition, setReservationPosition] = useState<{ column: number, rows: number[] } | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [email, setEmail] = useState('')
+  const [clientName, setClientName] = useState('')
+  const [clientPhone, setClientPhone] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [existingBookings, setExistingBookings] = useState<Booking[]>([])
 
   const getMonday = (date: Date): Date => {
     const d = new Date(date)
@@ -28,7 +38,7 @@ const ContactPage = () => {
 
   const getTimeSlots = (): string[] => {
     const slots: string[] = []
-    for (let hour = 8; hour < 21; hour++) {
+    for (let hour = 8; hour <= 18; hour++) {
       slots.push(`${hour.toString().padStart(2, '0')}:00`)
     }
     return slots
@@ -39,6 +49,40 @@ const ContactPage = () => {
   const dayNames = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
   const MIN_ADVANCE_HOURS = 12
+
+  useEffect(() => {
+    loadBookings();
+  }, []);
+
+  const loadBookings = async () => {
+    try {
+      const response = await getPublicBookings();
+      setExistingBookings(response.data);
+    } catch (error) {
+      console.error('Błąd ładowania rezerwacji:', error);
+    }
+  };
+
+  const isSlotBooked = (day: Date, time: string): boolean => {
+    const [hour] = time.split(':').map(Number);
+    const slotDate = new Date(day);
+    slotDate.setHours(hour, 0, 0, 0);
+    
+    return existingBookings.some(booking => {
+      const bookingStart = new Date(booking.booking_date);
+      const durationMatch = booking.notes?.match(/Duration: (\d+) hour/);
+      const duration = durationMatch ? parseInt(durationMatch[1], 10) : 1;
+      const bookingEnd = new Date(bookingStart.getTime() + duration * 60 * 60 * 1000);
+      
+      // Slot jest zajęty jeśli mieści się w zakresie rezerwacji
+      return slotDate >= bookingStart && slotDate < bookingEnd;
+    });
+  };
+
+  const canBookSlot = (day: Date, time: string): boolean => {
+    // Nie można zarezerwować jeśli slot jest w przeszłości lub już zajęty
+    return !isPastSlot(day, time) && !isSlotBooked(day, time);
+  };
 
   const isToday = (date: Date): boolean => {
     const today = new Date()
@@ -53,17 +97,6 @@ const ContactPage = () => {
     slotDate.setHours(hour, 0, 0, 0)
     const minAdvanceMs = MIN_ADVANCE_HOURS * 60 * 60 * 1000
     return slotDate.getTime() < now.getTime() + minAdvanceMs
-  }
-
-  const handleSlotClick = (day: Date, time: string) => {
-    const key = `${day.toISOString().split('T')[0]}-${time}`
-    const newSlots = new Set(selectedSlots)
-    if (newSlots.has(key)) {
-      newSlots.delete(key)
-    } else {
-      newSlots.add(key)
-    }
-    setSelectedSlots(newSlots)
   }
 
   const goToPreviousWeek = () => {
@@ -91,6 +124,11 @@ const ContactPage = () => {
   }
 
   const onClick = ({ day, time, dayIndex }: { day: Date, time: string, dayIndex: number }) => {
+    // Sprawdź czy slot można zarezerwować
+    if (!canBookSlot(day, time)) {
+      return;
+    }
+
     setReservationPosition((prev) => {
 
       if (prev?.column !== dayIndex) {
@@ -129,21 +167,54 @@ const ContactPage = () => {
     setShowModal(true)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (email && reservationPosition) {
-      // Tutaj możesz dodać logikę wysyłania rezerwacji
-      console.log('Rezerwacja:', { email, reservationPosition, weekDays })
-      alert(`Rezerwacja potwierdzona dla: ${email}`)
+    if (!email || !clientName || !reservationPosition) return
+
+    setSubmitting(true)
+    
+    try {
+      // Oblicz datę i godzinę rozpoczęcia rezerwacji
+      const startRowIdx = Math.min(...reservationPosition.rows)
+      const startHour = parseInt(timeSlots[startRowIdx].split(':')[0], 10)
+      const bookingDay = weekDays[reservationPosition.column]
+      
+      const bookingDateTime = new Date(bookingDay)
+      bookingDateTime.setHours(startHour, 0, 0, 0)
+      
+      // Oblicz czas trwania w godzinach
+      const duration = reservationPosition.rows.length
+      
+      await createBooking({
+        client_name: clientName,
+        client_email: email,
+        client_phone: clientPhone || undefined,
+        service_name: 'Photo shoot',
+        booking_date: bookingDateTime.toISOString(),
+        notes: `Duration: ${duration} hour(s)`
+      })
+      
+      alert(`Reservation confirmed for ${clientName}! We will contact you at ${email}`)
       setShowModal(false)
       setEmail('')
+      setClientName('')
+      setClientPhone('')
       setReservationPosition(null)
+    } catch (error) {
+      console.error('Booking error:', error)
+      const any = error as any
+      const detail = any?.response?.data?.detail || any?.message || ''
+      alert(`Failed to create booking. ${detail}`.trim())
+    } finally {
+      setSubmitting(false)
     }
   }
 
   const handleCloseModal = () => {
     setShowModal(false)
     setEmail('')
+    setClientName('')
+    setClientPhone('')
   }
 
   const formatShortDate = (d: Date) =>
@@ -182,14 +253,16 @@ const ContactPage = () => {
             {timeSlots.map((time, timeIndex) => (
               weekDays.map((day, dayIndex) => {
                 const slotKey = `${day.toISOString().split('T')[0]}-${time}`
-                const isSelected = selectedSlots.has(slotKey)
                 const isPast = isPastSlot(day, time)
+                const isBooked = isSlotBooked(day, time)
+                const isAvailable = canBookSlot(day, time)
+                
                 return (
                   <div
                     key={slotKey}
-                    className={`slot ${isSelected ? 'selected' : ''} ${isPast ? 'past' : ''}`}
-                    onClick={() => !isPast && onClick({ day, time, dayIndex })}
-                    title={`${dayNames[dayIndex]} ${time}`}
+                    className={`slot ${isPast ? 'past' : ''} ${isBooked ? 'booked' : ''} ${isAvailable ? 'available' : ''}`}
+                    onClick={() => onClick({ day, time, dayIndex })}
+                    title={`${dayNames[dayIndex]} ${time}${isBooked ? ' (zajęte)' : isPast ? ' (przeszłość)' : ' (dostępne)'}`}
                     style={{
                       gridColumn: dayIndex + 1,
                       gridRow: timeIndex + 1
@@ -233,18 +306,35 @@ const ContactPage = () => {
                 </div>
               </div>
             )}
-            <div className="modal-description">Please, leave your email, so I can confirm your reservation</div>
+            <div className="modal-description">Please provide your contact details so I can confirm your reservation</div>
             <form onSubmit={handleSubmit}>
               <input
+                type="text"
+                placeholder="Your name"
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+                required
+                className="email-input"
+              />
+              <input
                 type="email"
-                placeholder="Enter your email"
+                placeholder="Your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 className="email-input"
               />
+              <input
+                type="tel"
+                placeholder="Phone number (optional)"
+                value={clientPhone}
+                onChange={(e) => setClientPhone(e.target.value)}
+                className="email-input"
+              />
               <div className="modal-buttons">
-                <button type="submit" className="modal-confirm-btn">Confirm</button>
+                <button type="submit" className="modal-confirm-btn" disabled={submitting}>
+                  {submitting ? 'Sending...' : 'Confirm'}
+                </button>
               </div>
             </form>
           </div>

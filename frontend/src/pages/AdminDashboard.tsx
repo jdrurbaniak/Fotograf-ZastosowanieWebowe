@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getAlbums, createAlbum, updateAlbum, deleteAlbum, getPhotos, uploadPhoto, updatePhoto, deletePhoto, reorderAlbums } from '../services/api';
+import { getAlbums, createAlbum, updateAlbum, deleteAlbum, getPhotos, uploadPhoto, updatePhoto, deletePhoto, reorderAlbums, getBookings, updateBookingStatus, deleteBooking } from '../services/api';
 
 interface Album {
   id: number;
@@ -18,9 +18,22 @@ interface Photo {
   album_id: number;
 }
 
+interface Booking {
+  id: number;
+  client_name: string;
+  client_email: string;
+  client_phone?: string;
+  service_name: string;
+  booking_date: string;
+  notes?: string;
+  status: string;
+}
+
 const AdminDashboard = () => {
+  const [activeTab, setActiveTab] = useState<'albums' | 'photos' | 'bookings'>('albums');
   const [albums, setAlbums] = useState<Album[]>([]);
   const [photos, setPhotos] = useState<Photo[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showPhotoUpload, setShowPhotoUpload] = useState(false);
   const [editingAlbum, setEditingAlbum] = useState<Album | null>(null);
@@ -36,6 +49,7 @@ const AdminDashboard = () => {
   useEffect(() => {
     loadAlbums();
     loadPhotos();
+    loadBookings();
   }, []);
 
   const loadAlbums = async () => {
@@ -65,6 +79,15 @@ const AdminDashboard = () => {
       setPhotos(response.data);
     } catch (error) {
       console.error('Błąd ładowania zdjęć:', error);
+    }
+  };
+
+  const loadBookings = async () => {
+    try {
+      const response = await getBookings();
+      setBookings(response.data);
+    } catch (error) {
+      console.error('Błąd ładowania rezerwacji:', error);
     }
   };
 
@@ -203,6 +226,29 @@ const AdminDashboard = () => {
 
   const isOrderDirty = initialOrder.length > 0 && (initialOrder.join(',') !== albums.map(a => a.id).join(','));
 
+  const renderTabs = () => (
+    <div className="admin-tabs">
+      <button
+        className={`tab-button ${activeTab === 'albums' ? 'active' : ''}`}
+        onClick={() => setActiveTab('albums')}
+      >
+        Albumy
+      </button>
+      <button
+        className={`tab-button ${activeTab === 'photos' ? 'active' : ''}`}
+        onClick={() => setActiveTab('photos')}
+      >
+        Zdjęcia
+      </button>
+      <button
+        className={`tab-button ${activeTab === 'bookings' ? 'active' : ''}`}
+        onClick={() => setActiveTab('bookings')}
+      >
+        Rezerwacje
+      </button>
+    </div>
+  );
+
   const onDragStart = (e: React.DragEvent, id: number) => {
     setDraggingId(id);
     e.dataTransfer.effectAllowed = 'move';
@@ -242,6 +288,9 @@ const AdminDashboard = () => {
     <div className="admin-container">
       <h1>Panel Administracyjny</h1>
       
+      {renderTabs()}
+      
+      {activeTab === 'albums' && (
       <section className="admin-section">
         <div className="section-header">
           <h2>Albumy</h2>
@@ -349,7 +398,9 @@ const AdminDashboard = () => {
           )}
         </div>
       </section>
+      )}
 
+      {activeTab === 'photos' && (
       <section className="admin-section">
         <div className="section-header">
           <h2>Zdjęcia</h2>
@@ -458,6 +509,81 @@ const AdminDashboard = () => {
           )}
         </div>
       </section>
+      )}
+
+      {activeTab === 'bookings' && (
+      <section className="admin-section">
+        <div className="section-header">
+          <h2>Rezerwacje</h2>
+        </div>
+        
+        {bookings.length === 0 ? (
+          <p style={{ textAlign: 'center', color: '#666', padding: '2rem' }}>
+            Brak rezerwacji.
+          </p>
+        ) : (
+          <div className="bookings-list">
+            {bookings.map(booking => (
+              <div key={booking.id} className="booking-card">
+                <div className="booking-info">
+                  <h3>{booking.client_name}</h3>
+                  <p><strong>Email:</strong> {booking.client_email}</p>
+                  {booking.client_phone && <p><strong>Tel:</strong> {booking.client_phone}</p>}
+                  <p><strong>Usługa:</strong> {booking.service_name}</p>
+                  <p><strong>Data:</strong> {new Date(booking.booking_date).toLocaleString('pl-PL')}</p>
+                  {booking.notes && <p><strong>Notatki:</strong> {booking.notes}</p>}
+                  <span className="badge" style={{
+                    display: 'inline-block',
+                    padding: '4px 12px',
+                    borderRadius: 12,
+                    fontSize: 13,
+                    marginTop: 8,
+                    background: booking.status === 'potwierdzona' ? '#e6ffe6' : booking.status === 'odrzucona' ? '#ffe6e6' : '#fff3cd',
+                    color: booking.status === 'potwierdzona' ? '#147014' : booking.status === 'odrzucona' ? '#8a1010' : '#856404',
+                  }}>
+                    {booking.status}
+                  </span>
+                </div>
+                <div className="booking-actions">
+                  {booking.status === 'oczekująca' && (
+                    <>
+                      <button
+                        className="btn-edit"
+                        onClick={async () => {
+                          await updateBookingStatus(booking.id, 'potwierdzona');
+                          loadBookings();
+                        }}
+                      >
+                        Potwierdź
+                      </button>
+                      <button
+                        className="btn-secondary"
+                        onClick={async () => {
+                          await updateBookingStatus(booking.id, 'odrzucona');
+                          loadBookings();
+                        }}
+                      >
+                        Odrzuć
+                      </button>
+                    </>
+                  )}
+                  <button
+                    className="btn-delete"
+                    onClick={async () => {
+                      if (!confirm('Czy na pewno chcesz usunąć tę rezerwację?')) return;
+                      await deleteBooking(booking.id);
+                      loadBookings();
+                    }}
+                  >
+                    Usuń
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+      )}
     </div>
   );
 };
