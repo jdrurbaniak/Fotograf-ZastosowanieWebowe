@@ -24,14 +24,15 @@
 }
 
 .navbar {
-  background-color: #f8f9fa;
-  padding: 2.5rem 1rem 1rem 1rem;
-
+  background-color: white;
+  padding: 2.5rem 1rem 2.5rem 1rem;
   position: fixed;
   top: 0;
   left: 0;
   z-index: 1000;
-  width: 100vw;
+  width: 100%;
+  backdrop-filter: blur(10px);
+  box-sizing: border-box;
 }
 
 
@@ -56,11 +57,30 @@
   color: #222;
   font-weight: 500;
   padding: 0.5rem 1rem;
+  position: relative;
+  display: inline-block;
+  transition: color 0.3s;
+}
+
+.navbar a::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background-color: #000;
+  transition: width 0.3s ease, left 0.3s ease;
 }
 
 .navbar a:hover {
-  background-color: #ffffffcd;
+  background-color: transparent;
   color: #000;
+}
+
+.navbar a:hover::after {
+  width: 100%;
+  left: 0;
 }
 
 /* Gallery styles */
@@ -68,6 +88,7 @@
   max-width: 800px;
   margin: 0 auto 1.5rem auto;
   text-align: center;
+  color: #666;
 }
 
 .gallery-container {
@@ -85,7 +106,7 @@
 .gallery-item {
   position: relative;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 10px;
   cursor: pointer;
   /* transition: transform 0.3s ease; */
   break-inside: avoid;
@@ -128,7 +149,7 @@
 }
 
 .modal-content h2 {
-  color: white;
+  color: black;
   text-align: center;
   margin-top: 1rem;
 }
@@ -159,7 +180,7 @@
 .hero-photo img {
   max-width: 450px;
   height: auto;
-  border-radius: 8px;
+  border-radius: 10px;
   display: block;
   margin-left: auto;
   margin-right: auto;
