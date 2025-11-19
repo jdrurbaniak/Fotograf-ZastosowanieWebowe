@@ -17,7 +17,13 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 # --- Konfiguracja CORS ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"], # Adres deweloperski Vite/React
+    allow_origins=[
+        "http://localhost:5173",      # Vite dev server
+        "http://127.0.0.1:5173",      # Vite dev server
+        "http://localhost",           # Frontend w Docker (port 80)
+        "http://localhost:3000",      # Alternatywny port
+        "http://frontend",            # Nazwa serwisu Docker
+    ],
     allow_credentials=True,
     allow_methods=["*"], 
     allow_headers=["*"], 

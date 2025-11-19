@@ -22,6 +22,7 @@ def get_db_session():
         db.close()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/login/token")
+oauth2_optional_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/login/token", auto_error=False)
 
 def get_current_user(
     db: Session = Depends(get_db_session), 
@@ -60,4 +61,25 @@ def get_current_user(
         raise credentials_exception
         
     # Zwracamy obiekt użytkownika z bazy
+    return user
+
+def get_current_user_optional(
+    db: Session = Depends(get_db_session),
+    token: str | None = Depends(oauth2_optional_scheme)
+) -> models.user.User | None:
+    """
+    Wersja opcjonalna: zwraca użytkownika, jeśli token poprawny; w przeciwnym razie None.
+    Nie zgłasza 401, pozwala na różne zachowanie endpointu w zależności od logowania.
+    """
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str | None = payload.get("sub")
+        if not email:
+            return None
+        token_data = schemas.token.TokenData(email=email)
+    except JWTError:
+        return None
+    user = crud.crud_user.get_user_by_email(db, email=token_data.email)
     return user

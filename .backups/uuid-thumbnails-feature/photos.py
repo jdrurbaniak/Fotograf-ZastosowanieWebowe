@@ -3,7 +3,9 @@ from sqlalchemy.orm import Session
 from typing import List
 import shutil # Do zapisywania plików
 import os
-import time
+import uuid
+from PIL import Image
+from io import BytesIO
 
 from app import models, schemas, crud
 from app.dependencies import get_db_session, get_current_user
@@ -12,7 +14,7 @@ router = APIRouter()
 
 # --- Endpoint ZABEZPIECZONY (Przesyłanie Pliku) ---
 @router.post("/", response_model=schemas.photo.PhotoRead, status_code=status.HTTP_201_CREATED)
-def create_new_photo(
+async def create_new_photo(
     # Zamiast JSON, oczekujemy danych formularza
     title: str = Form(...),
     album_id: int = Form(...),
@@ -31,42 +33,75 @@ def create_new_photo(
     UPLOAD_DIR = "uploads"
     os.makedirs(UPLOAD_DIR, exist_ok=True) # Stwórz folder, jeśli nie istnieje
     
-    # 2. Ustal bezpieczną, unikalną nazwę pliku (pełny obraz, bez miniaturek)
+    # 2. Wygeneruj unikalną nazwę pliku używając UUID
     original_name = os.path.basename(file.filename or "")
     if not original_name:
         raise HTTPException(status_code=400, detail="Brak nazwy pliku")
-    name, ext = os.path.splitext(original_name)
-
-    # Uprość/bezpieczna nazwa pliku: usuń niebezpieczne znaki i zamień spacje na podkreślniki
-    safe_name = "".join(c for c in name if c.isalnum() or c in (' ', '-', '_')).rstrip()
-    safe_name = safe_name.replace(' ', '_') or str(int(time.time()))
-
-    candidate = f"{safe_name}{ext}"
-    file_path = os.path.join(UPLOAD_DIR, candidate)
-
-    # Jeśli istnieje plik o tej nazwie, dołącz znacznik czasu, a potem licznik, aby zapewnić unikalność
-    if os.path.exists(file_path):
-        ts = int(time.time())
-        candidate = f"{safe_name}-{ts}{ext}"
-        file_path = os.path.join(UPLOAD_DIR, candidate)
-        counter = 1
-        while os.path.exists(file_path):
-            candidate = f"{safe_name}-{ts}-{counter}{ext}"
-            file_path = os.path.join(UPLOAD_DIR, candidate)
-            counter += 1
-
+    _, ext = os.path.splitext(original_name)
+    ext = ext.lower() if ext else '.jpg'  # domyślne rozszerzenie jeśli brak
+    
+    # Użyj UUID dla gwarancji unikalności
+    unique_id = uuid.uuid4().hex
+    original_filename = f"{unique_id}{ext}"
+    thumbnail_filename = f"{unique_id}_thumb{ext}"
+    
+    original_path = os.path.join(UPLOAD_DIR, original_filename)
+    thumbnail_path = os.path.join(UPLOAD_DIR, thumbnail_filename)
+    
     try:
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        # Wczytaj zawartość pliku do pamięci
+        contents = await file.read()
+        
+        # Zapisz oryginalny plik
+        with open(original_path, "wb") as f:
+            f.write(contents)
+        
+        # Wygeneruj miniaturkę (300px szerokości, zachowując proporcje)
+        try:
+            img = Image.open(BytesIO(contents))
+            
+            # EXIF orientation - popraw rotację jeśli potrzeba
+            try:
+                from PIL import ImageOps
+                img = ImageOps.exif_transpose(img)
+            except Exception:
+                pass  # Jeśli brak EXIF, kontynuuj
+            
+            # Oblicz nowe wymiary (szerokość 300px)
+            THUMB_WIDTH = 300
+            width, height = img.size
+            if width > THUMB_WIDTH:
+                ratio = THUMB_WIDTH / width
+                new_height = int(height * ratio)
+                img_thumb = img.resize((THUMB_WIDTH, new_height), Image.Resampling.LANCZOS)
+            else:
+                img_thumb = img  # Jeśli mniejszy niż 300px, zostaw bez zmian
+            
+            # Zapisz miniaturkę (optymalizacja JPEG)
+            if img_thumb.mode in ('RGBA', 'LA', 'P'):
+                img_thumb = img_thumb.convert('RGB')
+            img_thumb.save(thumbnail_path, format='JPEG', quality=85, optimize=True)
+            
+        except Exception as thumb_error:
+            # Jeśli nie udało się wygenerować miniaturki, zapisz None
+            print(f"Warning: Nie można wygenerować miniaturki: {thumb_error}")
+            thumbnail_path = None
+    
     except Exception as e:
+        # Usuń pliki jeśli coś poszło nie tak
+        if os.path.exists(original_path):
+            os.remove(original_path)
+        if thumbnail_path and os.path.exists(thumbnail_path):
+            os.remove(thumbnail_path)
         raise HTTPException(status_code=500, detail=f"Nie można zapisać pliku: {e}")
     finally:
-        file.file.close()
+        await file.close()
 
     photo_in = schemas.photo.PhotoCreate(
         title=title,
         description=description,
-        image_url=f"/{file_path}",  # Ścieżka URL do oryginału
+        image_url=f"/{original_path}",  # Ścieżka URL do oryginału
+        thumbnail_url=f"/{thumbnail_path}" if thumbnail_path else None,  # Ścieżka URL do miniaturki
         album_id=album_id
     )
     

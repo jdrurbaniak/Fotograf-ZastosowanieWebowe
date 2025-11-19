@@ -8,6 +8,7 @@ def create_photo(db: Session, photo: PhotoCreate) -> Photo:
         title=photo.title,
         description=photo.description,
         image_url=photo.image_url,
+        thumbnail_url=photo.thumbnail_url,
         album_id=photo.album_id
     )
     db.add(db_photo)

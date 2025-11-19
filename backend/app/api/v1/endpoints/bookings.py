@@ -56,4 +56,17 @@ def update_booking(
     
     return db_booking
 
-# Można też dodać endpoint DELETE do usuwania rezerwacji
+@router.delete("/{booking_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_booking(
+    booking_id: int,
+    db: Session = Depends(get_db_session),
+    current_user: models.user.User = Depends(get_current_user)
+):
+    """
+    Usuwa rezerwację. Wymaga autentykacji.
+    """
+    db_booking = crud.crud_booking.delete_booking(db, booking_id=booking_id)
+    if db_booking is None:
+        raise HTTPException(status_code=404, detail="Rezerwacja nie znaleziona")
+    
+    return None

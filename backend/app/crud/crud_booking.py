@@ -30,3 +30,13 @@ def update_booking_status(db: Session, booking_id: int, status: models.booking.B
     db.commit()
     db.refresh(db_booking)
     return db_booking
+
+# Usuwanie rezerwacji (dla admina)
+def delete_booking(db: Session, booking_id: int):
+    db_booking = get_booking(db, booking_id=booking_id)
+    if not db_booking:
+        return None
+    
+    db.delete(db_booking)
+    db.commit()
+    return db_booking

@@ -22,3 +22,34 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+venv/
+env/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+backup.sql
+
+# Docker volumes
+postgres_data/
+uploads/
+
+# Development notes
+CHECKLIST.md
+DOCKER-SETUP.md
+instructions.md
+PROGRESS.md
