@@ -13,6 +13,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Kopiujemy całą aplikację
 COPY . .
 
+# Copy entrypoint script that applies DB migrations before starting the app
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 # Tworzymy katalog na przesłane pliki
 RUN mkdir -p /app/uploads
 
@@ -20,4 +24,4 @@ RUN mkdir -p /app/uploads
 EXPOSE 8000
 
 # Uruchamiamy aplikację za pomocą uvicorn
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["/bin/sh", "/app/entrypoint.sh"]
