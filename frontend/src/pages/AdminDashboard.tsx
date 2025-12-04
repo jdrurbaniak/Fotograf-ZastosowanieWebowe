@@ -488,14 +488,7 @@ const AdminDashboard = () => {
           ) : (
             photos.map(photo => (
               <div key={photo.id} className="photo-card">
-                <div className="aspect-square bg-gray-200 overflow-hidden">
-                  <img
-                    src={getImageUrl(photo.thumbnail_url || photo.image_url)}
-                    alt={photo.title}
-                    loading="lazy"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
+                <img src={getImageUrl(photo.thumbnail_url || photo.image_url)} alt={photo.title} className="photo-thumbnail" />
                 <div className="photo-info">
                   <h4>{photo.title}</h4>
                   {photo.description && <p>{photo.description}</p>}
