@@ -1,15 +1,112 @@
 ﻿from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
 from sqlalchemy.orm import Session
 from typing import List
-from PIL import Image
+from PIL import Image, ImageOps
 import shutil
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 from app import models, schemas, crud
 from app.dependencies import get_db_session, get_current_user
 
 router = APIRouter()
+
+# Thread pool for background image thumbnail processing
+_thumbnail_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="thumbnail_")
+
+
+def _generate_thumbnail_sync(file_path: str, thumbnail_path: str) -> tuple[bool, str | None]:
+    """
+    Synchronous function to generate a thumbnail. Runs in a thread pool worker.
+    Returns (success: bool, thumbnail_url: str | None)
+    Produces highly compressed WebP thumbnails (max 400x400, quality=55).
+    Falls back to JPEG/PNG when necessary.
+    
+    Strategy:
+    - Skip processing if original is pre-compressed (JPEG/WebP) and < 150KB — just copy
+    - Resize to max 400x400 (small enough for web galleries)
+    - Use aggressive WebP compression (quality=55, method=6)
+    - For PNG fallback: quantize to 256 colors for massive size reduction
+    """
+    try:
+        # Check file size to decide if we should skip processing
+        file_size_kb = os.path.getsize(file_path) / 1024
+        is_compressed = file_path.lower().endswith(('.jpg', '.jpeg', '.webp'))
+        
+        # If already compressed and small, just copy it as thumbnail
+        if is_compressed and file_size_kb < 150:
+            os.makedirs(os.path.dirname(thumbnail_path), exist_ok=True)
+            import shutil
+            shutil.copy2(file_path, thumbnail_path)
+            return True, f"/{thumbnail_path}"
+        
+        with Image.open(file_path) as img:
+            # Correct orientation from EXIF if present
+            img = ImageOps.exif_transpose(img)
+            
+            # Check original dimensions
+            orig_width, orig_height = img.size
+            target_size = 400  # Reduced from 800 to 400 for smaller file sizes
+            
+            # Detect alpha channel
+            bands = img.getbands()
+            has_alpha = "A" in bands
+            
+            # Convert to appropriate mode for saving
+            if has_alpha:
+                img = img.convert("RGBA")
+            else:
+                img = img.convert("RGB")
+            
+            # Only resize if larger than target; never upscale
+            if orig_width > target_size or orig_height > target_size:
+                img.thumbnail((target_size, target_size), Image.Resampling.LANCZOS)
+            
+            # Ensure target directory exists
+            os.makedirs(os.path.dirname(thumbnail_path), exist_ok=True)
+            
+            # Prefer WebP for thumbnails with aggressive compression
+            save_format = "WEBP"
+            webp_kwargs: dict = {"quality": 55, "method": 6}  # Quality=55 for smaller files
+            
+            # Try saving as WebP; if that fails, fallback to JPEG/PNG
+            try:
+                img.save(thumbnail_path, format=save_format, **webp_kwargs)
+            except Exception:
+                if not has_alpha:
+                    # Fallback JPEG for no-alpha images
+                    img.save(thumbnail_path, format="JPEG", optimize=True, quality=55, progressive=True)
+                else:
+                    # Fallback PNG with aggressive quantization to 256 colors
+                    try:
+                        quantized = img.quantize(colors=256, method=Image.MEDIANCUT)
+                        quantized.save(thumbnail_path, format="PNG", optimize=True)
+                    except Exception:
+                        img.save(thumbnail_path, format="PNG", optimize=True)
+            
+            return True, f"/{thumbnail_path}"
+    except Exception as e:
+        print(f"Warning: could not create thumbnail for {file_path}: {e}")
+        return False, None
+
+
+def _update_photo_thumbnail(photo_id: int, thumbnail_url: str | None) -> None:
+    """
+    Background task to update photo record with thumbnail URL after generation completes.
+    Runs in a thread pool worker.
+    """
+    from app.database import SessionLocal
+    try:
+        db = SessionLocal()
+        photo = crud.crud_photo.get_photo(db, photo_id=photo_id)
+        if photo:
+            photo.thumbnail_url = thumbnail_url
+            db.commit()
+            db.refresh(photo)
+        db.close()
+    except Exception as e:
+        print(f"Warning: could not update thumbnail_url for photo {photo_id}: {e}")
 
 
 # --- Endpoint ZABEZPIECZONY (Przesylanie Pliku) ---
@@ -61,26 +158,16 @@ def create_new_photo(
     finally:
         file.file.close()
 
-    # Generowanie miniatury
+    # Generowanie miniatury asynchronicznie (w thread pool)
+    # Nie blokujemy request — zwracamy odpowiedź szybko, miniatura będzie wygenerowana w tle
     thumbnail_url: str | None = None
     thumbnail_path = os.path.join(THUMB_DIR, candidate)
-    try:
-        with Image.open(file_path) as img:
-            img = img.convert("RGB") if img.mode not in ("RGB", "RGBA") else img
-            img.thumbnail((800, 800))
-            save_format = "JPEG" if ext.lower() in (".jpg", ".jpeg", "") else "PNG"
-            img.save(thumbnail_path, format=save_format, optimize=True, quality=85)
-            thumbnail_url = f"/{thumbnail_path}"
-    except Exception as thumb_err:
-        # Miniatura opcjonalna: log do konsoli, ale nie przerywamy uploadu
-        print(f"Warning: could not create thumbnail for {file_path}: {thumb_err}")
-        thumbnail_path = None
 
     photo_in = schemas.photo.PhotoCreate(
         title=title,
         description=description,
         image_url=f"/{file_path}",
-        thumbnail_url=thumbnail_url,
+        thumbnail_url=thumbnail_url,  # Initially None; will be filled in background
         album_id=album_id,
     )
 
@@ -88,11 +175,26 @@ def create_new_photo(
     if not db_album:
         if os.path.exists(file_path):
             os.remove(file_path)
-        if thumbnail_path and os.path.exists(thumbnail_path):
-            os.remove(thumbnail_path)
         raise HTTPException(status_code=404, detail=f"Album o ID {album_id} nie istnieje.")
 
-    return crud.crud_photo.create_photo(db=db, photo=photo_in)
+    # Create photo in database immediately
+    db_photo = crud.crud_photo.create_photo(db=db, photo=photo_in)
+
+    # Queue thumbnail generation as background task (non-blocking)
+    _thumbnail_executor.submit(_generate_thumbnail_and_update, file_path, thumbnail_path, db_photo.id)
+
+    return db_photo
+
+
+def _generate_thumbnail_and_update(file_path: str, thumbnail_path: str, photo_id: int) -> None:
+    """
+    Background task: generate thumbnail and update photo record.
+    Runs in a thread pool worker (does not block request).
+    """
+    success, thumbnail_url = _generate_thumbnail_sync(file_path, thumbnail_path)
+    if success:
+        _update_photo_thumbnail(photo_id, thumbnail_url)
+
 
 
 # --- Endpointy PUBLICZNE ---
