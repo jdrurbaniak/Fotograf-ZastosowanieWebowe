@@ -23,6 +23,7 @@ app.add_middleware(
         "http://localhost",           # Frontend w Docker (port 80)
         "http://localhost:3000",      # Alternatywny port
         "http://frontend",            # Nazwa serwisu Docker
+        "*"                          # Dla testów - zezwala na wszystkie domeny
     ],
     allow_credentials=True,
     allow_methods=["*"], 

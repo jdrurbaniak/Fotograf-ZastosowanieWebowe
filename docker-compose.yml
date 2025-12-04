@@ -50,7 +50,7 @@ services:
       dockerfile: Dockerfile
     container_name: fotograf_frontend
     ports:
-      - "80:80"
+      - "3000:80"
     volumes:
       - ./frontend/public/uploads:/usr/share/nginx/html/uploads
     depends_on:
