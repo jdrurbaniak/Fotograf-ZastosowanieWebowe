@@ -59,7 +59,15 @@ const ImageGallery = () => {
             className="gallery-item"
             onClick={() => setSelectedImage(photo)}
           >
-            <img src={getImageUrl(photo.thumbnail_url || photo.image_url)} alt={photo.title} loading="lazy" />
+            {/* Fixed-height container to reserve space and avoid CLS; image is cropped via object-cover */}
+            <div className="h-48 bg-gray-200 overflow-hidden rounded">
+              <img
+                src={getImageUrl(photo.thumbnail_url || photo.image_url)}
+                alt={photo.title}
+                loading="lazy"
+                className="w-full h-full object-cover"
+              />
+            </div>
           </div>
         ))}
       </div>
