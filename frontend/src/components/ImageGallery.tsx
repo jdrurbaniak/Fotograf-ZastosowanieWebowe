@@ -52,24 +52,36 @@ const ImageGallery = () => {
 
   return (
     <div className="gallery-container">
-      <div className="gallery-grid">
+      {/* Use a responsive CSS Grid and preserve aspect ratio to avoid CLS */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
         {photos.map((photo) => (
-          <div
+          <button
             key={photo.id}
-            className="gallery-item"
             onClick={() => setSelectedImage(photo)}
+            className="focus:outline-none"
+            aria-label={`Otwórz ${photo.title}`}
           >
-            <img src={getImageUrl(photo.thumbnail_url || photo.image_url)} alt={photo.title} loading="lazy" />
-          </div>
+            {/* Aspect ratio box — reserves space before image loads */}
+            <div className="aspect-square bg-gray-200 overflow-hidden rounded">
+              <img
+                src={getImageUrl(photo.thumbnail_url || photo.image_url)}
+                alt={photo.title}
+                loading="lazy"
+                className="w-full h-full object-cover"
+              />
+            </div>
+          </button>
         ))}
       </div>
 
       {selectedImage && (
-        <div className="modal" onClick={() => setSelectedImage(null)}>
-          <div className="modal-content">
-            <img src={getImageUrl(selectedImage.image_url)} alt={selectedImage.title} />
-            <h2>{selectedImage.title}</h2>
-            {selectedImage.description && <p>{selectedImage.description}</p>}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setSelectedImage(null)}>
+          <div className="bg-white rounded max-w-3xl w-full mx-4 p-4">
+            <div className="w-full aspect-video bg-gray-100 overflow-hidden">
+              <img src={getImageUrl(selectedImage.image_url)} alt={selectedImage.title} className="w-full h-full object-contain" />
+            </div>
+            <h2 className="mt-4 text-lg font-semibold">{selectedImage.title}</h2>
+            {selectedImage.description && <p className="mt-2">{selectedImage.description}</p>}
           </div>
         </div>
       )}
