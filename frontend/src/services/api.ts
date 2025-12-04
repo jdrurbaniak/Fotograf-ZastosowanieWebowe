@@ -1,12 +1,16 @@
 import axios from 'axios';
+import type { InternalAxiosRequestConfig } from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// Prefer konfigurację przez zmienną środowiskową Vite (VITE_API_URL), z fallbackiem na statyczny adres.
+const API_URL = import.meta.env.VITE_API_URL || 'http://51.120.24.113:8000';
 
 export const api = axios.create({
   baseURL: API_URL,
 });
 
-api.interceptors.request.use((config) => {
+api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  // Upewnij się, że obiekt nagłówków istnieje
+  config.headers = config.headers || {};
   const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
