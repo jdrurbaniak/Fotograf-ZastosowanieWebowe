@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
+from fastapi_cache.decorator import cache
 
 from app import models, schemas, crud
 from app.dependencies import get_db_session, get_current_user, get_current_user_optional
@@ -26,6 +27,7 @@ def create_new_album(
 
 # --- Endpointy PUBLICZNE ---
 @router.get("/", response_model=List[schemas.album.AlbumRead])
+@cache(expire=60)
 def read_all_albums(
     skip: int = 0,
     limit: int = 100,
@@ -42,6 +44,7 @@ def read_all_albums(
     return crud.crud_album.get_albums(db, skip=skip, limit=limit)
 
 @router.get("/{album_id}", response_model=schemas.album.AlbumRead)
+@cache(expire=60)
 def read_single_album(
     album_id: int,
     db: Session = Depends(get_db_session),

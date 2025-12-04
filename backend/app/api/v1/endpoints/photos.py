@@ -5,6 +5,7 @@ from PIL import Image, ImageOps
 import shutil
 import os
 import time
+from fastapi_cache.decorator import cache
 from concurrent.futures import ThreadPoolExecutor
 
 from app import models, schemas, crud
@@ -199,6 +200,7 @@ def _generate_thumbnail_and_update(file_path: str, thumbnail_path: str, photo_id
 
 # --- Endpointy PUBLICZNE ---
 @router.get("/", response_model=List[schemas.photo.PhotoRead])
+@cache(expire=60)
 def read_all_photos(
     skip: int = 0,
     limit: int = 100,
@@ -212,6 +214,7 @@ def read_all_photos(
 
 
 @router.get("/album/{album_id}", response_model=List[schemas.photo.PhotoRead])
+@cache(expire=60)
 def read_photos_for_album(
     album_id: int,
     skip: int = 0,
