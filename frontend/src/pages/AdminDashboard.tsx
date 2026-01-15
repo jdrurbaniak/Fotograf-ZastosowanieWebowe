@@ -201,10 +201,17 @@ const AdminDashboard = () => {
   const handlePhotoDelete = async (id: number) => {
     if (!confirm('Czy na pewno chcesz usunąć to zdjęcie?')) return;
     try {
+      // Optymistyczna aktualizacja UI
+      setPhotos(prevPhotos => prevPhotos.filter(photo => photo.id !== id));
+      
       await deletePhoto(id);
-      loadPhotos();
+      // Opcjonalnie: załaduj ponownie, aby upewnić się, że stan jest zgodny z serwerem
+      // loadPhotos(); 
     } catch (error) {
       console.error('Błąd usuwania zdjęcia:', error);
+      // W razie błędu przywróć stan (trzeba by go wcześniej zapisać lub po prostu przeładować)
+      loadPhotos();
+      alert('Wystąpił błąd podczas usuwania zdjęcia.');
     }
   };
 
@@ -488,7 +495,7 @@ const AdminDashboard = () => {
           ) : (
             photos.map(photo => (
               <div key={photo.id} className="photo-card">
-                <div className="h-48 bg-gray-200 overflow-hidden rounded">
+                <div className="bg-gray-200 overflow-hidden rounded" style={{ height: '300px' }}>
                   <img src={getImageUrl(photo.thumbnail_url || photo.image_url)} alt={photo.title} className="w-full h-full object-cover" />
                 </div>
                 <div className="photo-info">

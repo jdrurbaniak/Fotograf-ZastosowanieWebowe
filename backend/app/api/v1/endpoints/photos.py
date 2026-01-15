@@ -1,11 +1,11 @@
-﻿from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
+﻿from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form, Response
 from sqlalchemy.orm import Session
 from typing import List
 from PIL import Image, ImageOps
 import shutil
 import os
 import time
-from fastapi_cache.decorator import cache
+import gc
 from concurrent.futures import ThreadPoolExecutor
 
 from app import models, schemas, crud
@@ -14,7 +14,8 @@ from app.dependencies import get_db_session, get_current_user
 router = APIRouter()
 
 # Thread pool for background image thumbnail processing
-_thumbnail_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="thumbnail_")
+# Zmniejszamy max_workers do 1, aby uniknąć problemów z pamięcią na małych instancjach (np. Azure B1s)
+_thumbnail_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="thumbnail_")
 
 
 def _generate_thumbnail_sync(file_path: str, thumbnail_path: str) -> tuple[bool, str | None]:
@@ -25,23 +26,12 @@ def _generate_thumbnail_sync(file_path: str, thumbnail_path: str) -> tuple[bool,
     Falls back to JPEG/PNG when necessary.
     
     Strategy:
-    - Skip processing if original is pre-compressed (JPEG/WebP) and < 150KB — just copy
+    - Always resize and compress thumbnails regardless of source format or size
     - Resize to max 400x400 (small enough for web galleries)
     - Use aggressive WebP compression (quality=55, method=6)
     - For PNG fallback: quantize to 256 colors for massive size reduction
     """
     try:
-        # Check file size to decide if we should skip processing
-        file_size_kb = os.path.getsize(file_path) / 1024
-        is_compressed = file_path.lower().endswith(('.jpg', '.jpeg', '.webp'))
-        
-        # If already compressed and small, just copy it as thumbnail
-        if is_compressed and file_size_kb < 150:
-            os.makedirs(os.path.dirname(thumbnail_path), exist_ok=True)
-            import shutil
-            shutil.copy2(file_path, thumbnail_path)
-            return True, f"/{thumbnail_path}"
-        
         with Image.open(file_path) as img:
             # Correct orientation from EXIF if present
             img = ImageOps.exif_transpose(img)
@@ -89,7 +79,12 @@ def _generate_thumbnail_sync(file_path: str, thumbnail_path: str) -> tuple[bool,
             return True, f"/{thumbnail_path}"
     except Exception as e:
         print(f"Warning: could not create thumbnail for {file_path}: {e}")
+        import traceback
+        traceback.print_exc()
         return False, None
+    finally:
+        # Wymuszamy zwolnienie pamięci po przetworzeniu każdego zdjęcia
+        gc.collect()
 
 
 def _update_photo_thumbnail(photo_id: int, thumbnail_url: str | None) -> None:
@@ -112,7 +107,7 @@ def _update_photo_thumbnail(photo_id: int, thumbnail_url: str | None) -> None:
 
 # --- Endpoint ZABEZPIECZONY (Przesylanie Pliku) ---
 @router.post("/", response_model=schemas.photo.PhotoRead, status_code=status.HTTP_201_CREATED)
-def create_new_photo(
+async def create_new_photo(
     title: str = Form(...),
     album_id: int = Form(...),
     description: str | None = Form(default=None),
@@ -124,6 +119,10 @@ def create_new_photo(
     Przesyla nowe zdjecie, zapisuje oryginal i miniature oraz rekord w bazie.
     Wymaga autentykacji administratora.
     """
+
+    # Invalidate cache immediately
+    # Używamy namespace="fastapi-cache", ponieważ taki prefix został ustawiony w main.py
+    # await FastAPICache.clear(namespace="fastapi-cache")
 
     UPLOAD_DIR = "uploads"
     THUMB_DIR = os.path.join(UPLOAD_DIR, "thumbnails")
@@ -162,7 +161,8 @@ def create_new_photo(
     # Generowanie miniatury asynchronicznie (w thread pool)
     # Nie blokujemy request — zwracamy odpowiedź szybko, miniatura będzie wygenerowana w tle
     thumbnail_url: str | None = None
-    thumbnail_path = os.path.join(THUMB_DIR, candidate)
+    # Używamy rozszerzenia .webp dla miniaturek, ponieważ taki jest docelowy format
+    thumbnail_path = os.path.join(THUMB_DIR, f"{candidate}.webp")
 
     photo_in = schemas.photo.PhotoCreate(
         title=title,
@@ -200,8 +200,8 @@ def _generate_thumbnail_and_update(file_path: str, thumbnail_path: str, photo_id
 
 # --- Endpointy PUBLICZNE ---
 @router.get("/", response_model=List[schemas.photo.PhotoRead])
-@cache(expire=60)
 def read_all_photos(
+    response: Response,
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db_session),
@@ -209,14 +209,19 @@ def read_all_photos(
     """
     Pobiera liste wszystkich zdjec. Publicznie dostepne.
     """
+    # Disable browser caching for API response
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    
     photos = crud.crud_photo.get_all_photos(db, skip=skip, limit=limit)
     return photos
 
 
 @router.get("/album/{album_id}", response_model=List[schemas.photo.PhotoRead])
-@cache(expire=60)
 def read_photos_for_album(
     album_id: int,
+    response: Response,
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db_session),
@@ -224,6 +229,10 @@ def read_photos_for_album(
     """
     Pobiera liste zdjec dla konkretnego albumu. Publicznie dostepne.
     """
+    # Disable browser caching for API response
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
 
     photos = crud.crud_photo.get_photos_by_album(
         db, album_id=album_id, skip=skip, limit=limit
@@ -232,7 +241,7 @@ def read_photos_for_album(
 
 
 @router.patch("/{photo_id}", response_model=schemas.photo.PhotoRead)
-def update_photo(
+async def update_photo(
     photo_id: int,
     photo_update: schemas.photo.PhotoUpdate,
     db: Session = Depends(get_db_session),
@@ -244,11 +253,15 @@ def update_photo(
     db_photo = crud.crud_photo.update_photo(db, photo_id=photo_id, photo_update=photo_update)
     if db_photo is None:
         raise HTTPException(status_code=404, detail="Photo not found")
+    
+    # Invalidate cache immediately
+    # await FastAPICache.clear(namespace="fastapi-cache")
+    
     return db_photo
 
 
 @router.delete("/{photo_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_photo(
+async def delete_photo(
     photo_id: int,
     db: Session = Depends(get_db_session),
     current_user: models.user.User = Depends(get_current_user),
@@ -276,4 +289,8 @@ def delete_photo(
                 print(f"Warning: Could not delete thumbnail {thumb_path}: {e}")
 
     crud.crud_photo.delete_photo(db, photo_id=photo_id)
+    
+    # Invalidate cache AFTER database commit to avoid race conditions
+    # await FastAPICache.clear(namespace="fastapi-cache")
+    
     return None

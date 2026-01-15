@@ -16,3 +16,6 @@ __pycache__/
 .vscode/
 .idea/
 instructions.md
+
+# Uploads
+uploads/
