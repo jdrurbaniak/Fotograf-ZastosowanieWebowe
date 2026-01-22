@@ -8,5 +8,8 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     ALGORITHM: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int
+    
+    # Tryb optymalizacji: none, thumbnails, caching, all
+    OPTIMIZATION_MODE: str = "all"
 
 settings = Settings()

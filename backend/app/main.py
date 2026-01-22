@@ -8,13 +8,25 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 # Redis async client and FastAPI cache
+# Redis async client and FastAPI cache
 import redis.asyncio as aioredis
 from fastapi_cache import FastAPICache
 from fastapi_cache.backends.redis import RedisBackend
 
+# Import settings
+from app.core.config import settings
+
 # Tutaj będziemy importować nasze routery API
 from app.api.v1.api import api_router
 
+# Dummy backend for when caching is disabled
+class NullBackend:
+    async def get(self, key):
+        return None
+    async def set(self, key, value, expire=None):
+        pass
+    async def clear(self, namespace=None, key=None):
+        pass
 
 # Custom StaticFiles that adds Cache-Control header for browser caching
 class CacheControlStaticFiles(StaticFiles):
@@ -44,17 +56,26 @@ class CacheControlMiddleware(BaseHTTPMiddleware):
 # Lifespan context to initialize Redis-backed FastAPI cache
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    redis_url = os.getenv("REDIS_URL", "redis://redis:6379")
-    redis_client = aioredis.from_url(redis_url)
-    # Initialize FastAPI cache with Redis backend
-    FastAPICache.init(RedisBackend(redis_client), prefix="fastapi-cache")
-    try:
-        yield
-    finally:
+    # Determine if caching should be enabled
+    mode = settings.OPTIMIZATION_MODE.lower()
+    caching_enabled = mode in ["caching", "all"]
+
+    if caching_enabled:
+        redis_url = os.getenv("REDIS_URL", "redis://redis:6379")
+        redis_client = aioredis.from_url(redis_url)
+        # Initialize FastAPI cache with Redis backend
+        FastAPICache.init(RedisBackend(redis_client), prefix="fastapi-cache")
         try:
-            await redis_client.close()
-        except Exception:
-            pass
+            yield
+        finally:
+            try:
+                await redis_client.close()
+            except Exception:
+                pass
+    else:
+        # Initialize with NullBackend to avoid errors in @cache decorators
+        FastAPICache.init(NullBackend(), prefix="fastapi-cache")
+        yield
 
 
 app = FastAPI(
@@ -65,9 +86,11 @@ app = FastAPI(
 )
 
 # --- Serwowanie plików statycznych (zdjęć) ---
-# Zakładamy, że przesłane zdjęcia będą przechowywane w folderze 'uploads'
-# Używamy CacheControlStaticFiles, aby dodać długi okres cache dla przeglądarek
-app.mount("/uploads", CacheControlStaticFiles(directory="uploads"), name="uploads") 
+# Check caching mode for StaticFiles
+if settings.OPTIMIZATION_MODE.lower() in ["caching", "all"]:
+    app.mount("/uploads", CacheControlStaticFiles(directory="uploads"), name="uploads")
+else:
+    app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # --- Konfiguracja CORS ---
 app.add_middleware(
@@ -85,8 +108,9 @@ app.add_middleware(
     allow_headers=["*"], 
 )
 
-# Add cache header middleware for uploads
-app.add_middleware(CacheControlMiddleware)
+# Add cache header middleware for uploads ONLY if caching is enabled
+if settings.OPTIMIZATION_MODE.lower() in ["caching", "all"]:
+    app.add_middleware(CacheControlMiddleware)
 
 # --- Główny endpoint ---
 @app.get("/", tags=["Root"])

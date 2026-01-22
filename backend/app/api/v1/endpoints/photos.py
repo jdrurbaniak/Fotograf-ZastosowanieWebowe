@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from app import models, schemas, crud
 from app.dependencies import get_db_session, get_current_user
+from app.core.config import settings
 
 router = APIRouter()
 
@@ -182,7 +183,8 @@ async def create_new_photo(
     db_photo = crud.crud_photo.create_photo(db=db, photo=photo_in)
 
     # Queue thumbnail generation as background task (non-blocking)
-    _thumbnail_executor.submit(_generate_thumbnail_and_update, file_path, thumbnail_path, db_photo.id)
+    if settings.OPTIMIZATION_MODE.lower() in ["thumbnails", "all"]:
+        _thumbnail_executor.submit(_generate_thumbnail_and_update, file_path, thumbnail_path, db_photo.id)
 
     return db_photo
 
@@ -210,9 +212,10 @@ def read_all_photos(
     Pobiera liste wszystkich zdjec. Publicznie dostepne.
     """
     # Disable browser caching for API response
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    response.headers["Pragma"] = "no-cache"
-    response.headers["Expires"] = "0"
+    if settings.OPTIMIZATION_MODE.lower() not in ["caching", "all"]:
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
     
     photos = crud.crud_photo.get_all_photos(db, skip=skip, limit=limit)
     return photos
@@ -230,9 +233,10 @@ def read_photos_for_album(
     Pobiera liste zdjec dla konkretnego albumu. Publicznie dostepne.
     """
     # Disable browser caching for API response
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    response.headers["Pragma"] = "no-cache"
-    response.headers["Expires"] = "0"
+    if settings.OPTIMIZATION_MODE.lower() not in ["caching", "all"]:
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
 
     photos = crud.crud_photo.get_photos_by_album(
         db, album_id=album_id, skip=skip, limit=limit
