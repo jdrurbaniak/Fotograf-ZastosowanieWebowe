@@ -2,7 +2,7 @@ import axios from 'axios';
 import type { InternalAxiosRequestConfig } from 'axios';
 
 // Prefer konfigurację przez zmienną środowiskową Vite (VITE_API_URL), z fallbackiem na statyczny adres.
-const API_URL = import.meta.env.VITE_API_URL || 'http://51.120.24.113:8000';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 export const api = axios.create({
   baseURL: API_URL,
